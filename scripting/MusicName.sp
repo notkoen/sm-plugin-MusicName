@@ -11,7 +11,7 @@ public Plugin myinfo =
 {
 	name = "Music Names",
 	author = "koen",
-	description = "0.2",
+	description = "0.3",
 	version = "",
 	url = "https://github.com/notkoen"
 };
@@ -71,6 +71,17 @@ public void OnMapStart()
 {
 	GetCurrentMap(g_sCurrentMap, sizeof(g_sCurrentMap));
 	LoadConfig();
+}
+
+public void OnMapEnd()
+{
+	// ClearTrie is creating a memory leak
+	// ClearTrie(g_songNames);
+	// ClearTrie(g_printedAlready);
+	delete g_songNames;
+	delete g_printedAlready;
+	g_songNames = new StringMap();
+	g_printedAlready = new StringMap();
 }
 
 public void OnClientDisconnected(int client)
