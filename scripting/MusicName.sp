@@ -12,7 +12,7 @@ public Plugin myinfo =
 	name = "Music Names",
 	author = "koen",
 	description = "",
-	version = "0.4",
+	version = "0.5",
 	url = "https://github.com/notkoen"
 };
 
@@ -250,10 +250,14 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
 		g_sCurrentSong = sBuffer;
 		for (int client = 1; client <= MaxClients; client++)
 		{
-			if (g_bDisplay[client])
-			{
-				CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
-			}
+            if (!IsClientInGame(client) || IsFakeClient(client))
+                continue;
+
+			if (!g_bDisplay[client])
+                continue;
+			
+			CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
+			
 		}
 	}
 	return Plugin_Continue;
