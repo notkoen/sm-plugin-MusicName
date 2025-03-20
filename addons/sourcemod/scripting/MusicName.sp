@@ -11,13 +11,13 @@ public Plugin myinfo =
 {
 	name = "Music Names",
 	author = "koen",
-	description = "",
-	version = "0.6",
+	description = "Print current playing music name",
+	version = "0.7",
 	url = "https://github.com/notkoen"
 };
 
 char g_sCurrentSong[256];
-char g_sCurrentMap[256];
+char g_sCurrentMap[PLATFORM_MAX_PATH];
 bool g_bConfigLoaded = false;
 bool g_bDisplay[MAXPLAYERS+1] = {true, ...};
 Cookie g_cDisplayStyle;
@@ -53,7 +53,7 @@ public void OnPluginStart()
 
 	g_songNames = CreateTrie();
 	g_printedAlready = CreateTrie();
-	GetCurrentMap(g_sCurrentMap, 256);
+	GetCurrentMap(g_sCurrentMap, PLATFORM_MAX_PATH);
 	LoadConfig();
 }
 
@@ -105,7 +105,7 @@ public void OnClientCookiesCached(int client)
 public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
 	g_sCurrentSong = "";
-	ClearTrie(g_printedAlready);
+	g_printedAlready.Clear();
 	if (g_bConfigLoaded)
 	{
 		CreateTimer(5.0, Timer_OnRoundStartPost);
@@ -184,8 +184,8 @@ public void LoadConfig()
 {
 	g_bConfigLoaded = false;
 
-	ClearTrie(g_songNames);
-	ClearTrie(g_printedAlready);
+	g_songNames.Clear();
+	g_printedAlready.Clear();
 
 	char g_sConfig[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, g_sConfig, sizeof(g_sConfig), "configs/musicname/%s.cfg", g_sCurrentMap);
@@ -259,17 +259,12 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
 		}
 
-		DataPack hSongData = new DataPack();
-		hSongData.WriteString(sFileName);
-		RequestFrame(ClearPrintedAlready, hSongData);
+		RequestFrame(ClearPrintedAlready, sFileName);
 	}
 	return Plugin_Continue;
 }
 
-public void ClearPrintedAlready(DataPack hSongData)
+public void ClearPrintedAlready(char sFileName[PLATFORM_MAX_PATH])
 {
-	char sFileName[PLATFORM_MAX_PATH];
-	hSongData.Reset();
-	hSongData.ReadString(sFileName, sizeof(sFileName));
 	g_printedAlready.SetValue(sFileName, false);
 }
