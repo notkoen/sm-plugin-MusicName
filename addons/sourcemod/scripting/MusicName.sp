@@ -11,8 +11,8 @@ public Plugin myinfo =
 {
 	name = "Music Names",
 	author = "koen",
-	description = "",
-	version = "0.8",
+	description = "Displays the name of the current song in chat",
+	version = "0.9",
 	url = "https://github.com/notkoen"
 };
 
@@ -45,9 +45,8 @@ public void OnPluginStart()
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!AreClientCookiesCached(i))
-		{
 			continue;
-		}
+
 		OnClientCookiesCached(i);
 	}
 
@@ -92,16 +91,15 @@ public void OnClientDisconnected(int client)
 
 public void OnClientCookiesCached(int client)
 {
+	if (IsFakeClient(client))
+		return;
+
 	char buffer[2];
 	g_cDisplayStyle.Get(client, buffer, sizeof(buffer));
 	if (buffer[0] == '\0')
-	{
 		g_cDisplayStyle.Set(client, "1");
-	}
 	else
-	{
 		g_bDisplay[client] = view_as<bool>(StringToInt(buffer));
-	}
 }
 
 public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
@@ -109,9 +107,7 @@ public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 	g_sCurrentSong = "";
 	g_printedAlready.Clear();
 	if (g_bConfigLoaded)
-	{
 		CreateTimer(5.0, Timer_OnRoundStartPost);
-	}
 }
 
 public Action Timer_OnRoundStartPost(Handle timer)
@@ -123,22 +119,17 @@ public Action Timer_OnRoundStartPost(Handle timer)
 public void CookiesMenu(int client, CookieMenuAction actions, any info, char[] buffer, int maxlen)
 {
 	if (actions == CookieMenuAction_DisplayOption)
-	{
 		FormatEx(buffer, maxlen, "Display Music Names: %s", g_bDisplay[client] ? "On" : "Off");
-	}
 
 	if (actions == CookieMenuAction_SelectOption)
 	{
 		g_bDisplay[client] = !g_bDisplay[client];
 		g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
+
 		if (g_bDisplay[client])
-		{
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
-		}
 		else
-		{
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Disabled");
-		}
 		ShowCookieMenu(client);
 	}
 }
@@ -156,6 +147,7 @@ public Action Command_NowPlaying(int client, int args)
 		CPrintToChat(client, "%t %t", "Chat Prefix", "No Name");
 		return Plugin_Handled;
 	}
+
 	CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
 	return Plugin_Handled;
 }
@@ -164,14 +156,11 @@ public Action Command_ToggleNP(int client, int args)
 {
 	g_bDisplay[client] = !g_bDisplay[client];
 	g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
+
 	if (g_bDisplay[client])
-	{
 		CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
-	}
 	else
-	{
 		CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Disabled");
-	}
 	return Plugin_Handled;
 }
 
@@ -191,6 +180,7 @@ public void LoadConfig()
 
 	char g_sConfig[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, g_sConfig, sizeof(g_sConfig), "configs/musicname/%s.cfg", g_sCurrentMap);
+
 	KeyValues kv = new KeyValues("music");
 	if (!kv.ImportFromFile(g_sConfig))
 	{
@@ -218,6 +208,7 @@ public void LoadConfig()
 
 	delete kv;
 	g_bConfigLoaded = true;
+
 	return;
 }
 
@@ -238,11 +229,8 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
 	ReplaceString(sBuffer, sizeof(sBuffer), "\\", "/");
 
 	int lastSlash = FindCharInString(sBuffer, '/', true);
-	if (lastSlash == -1)
-	{
-		strcopy(sFileName, sizeof(sFileName), sBuffer);
-	}
-	else
+	strcopy(sFileName, sizeof(sFileName), sBuffer);
+	if (lastSlash != -1)
 	{
 		strcopy(sFileName, sizeof(sFileName), sBuffer);
 		sBuffer[lastSlash+1] = '\0';
@@ -260,6 +248,7 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
 	{
 		g_printedAlready.SetValue(sFileName, true);
 		g_sCurrentSong = sBuffer;
+		
 		for (int client = 1; client <= MaxClients; client++)
 		{
 			if (!IsClientInGame(client) || IsFakeClient(client))
@@ -283,5 +272,6 @@ public void ClearPrintedAlready(DataPack hSongData)
 	char sFileName[PLATFORM_MAX_PATH];
 	hSongData.Reset();
 	hSongData.ReadString(sFileName, sizeof(sFileName));
+	delete hSongData;
 	g_printedAlready.Remove(sFileName);
 }
