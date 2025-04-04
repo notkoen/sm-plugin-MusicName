@@ -6,23 +6,29 @@
 #include <sourcemod>
 #include <sdkhooks>
 #include <sdktools>
+#include <utilshelper>
 
 public Plugin myinfo =
 {
 	name = "Music Names",
 	author = "koen",
-	description = "",
-	version = "0.8",
+	description = "Displays the name of the current song in chat",
+	version = "1.0.0",
 	url = "https://github.com/notkoen"
 };
 
 char g_sCurrentSong[256];
 char g_sCurrentMap[PLATFORM_MAX_PATH];
+
 bool g_bConfigLoaded = false;
 bool g_bDisplay[MAXPLAYERS+1] = {true, ...};
+
 Cookie g_cDisplayStyle;
 StringMap g_songNames;
-StringMap g_printedAlready;
+StringMap g_fLastPlayedTime;
+
+float g_fCooldownTime = 30.0;
+ConVar g_cvCooldownTime;
 
 public void OnPluginStart()
 {
@@ -41,6 +47,12 @@ public void OnPluginStart()
 	SetCookieMenuItem(CookiesMenu, 0, "Music Names");
 
 	LoadTranslations("MusicName.phrases");
+	
+	g_cvCooldownTime = CreateConVar("sm_musicname_cooldown", "5.0", "Cooldown in seconds before the same song can be announced again", _, true, 1.0);
+	g_cvCooldownTime.AddChangeHook(OnCooldownChanged);
+	g_fCooldownTime = g_cvCooldownTime.FloatValue;
+	
+	AutoExecConfig(true);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -48,13 +60,19 @@ public void OnPluginStart()
 		{
 			continue;
 		}
+
 		OnClientCookiesCached(i);
 	}
 
 	g_songNames = new StringMap();
-	g_printedAlready = new StringMap();
+	g_fLastPlayedTime = new StringMap();
 	GetCurrentMap(g_sCurrentMap, PLATFORM_MAX_PATH);
 	LoadConfig();
+}
+
+public void OnCooldownChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	g_fCooldownTime = g_cvCooldownTime.FloatValue;
 }
 
 public void OnPluginEnd()
@@ -67,7 +85,7 @@ public void OnPluginEnd()
 	}
 
 	delete g_songNames;
-	delete g_printedAlready;
+	delete g_fLastPlayedTime;
 	RemoveAmbientSoundHook(Hook_AmbientSound);
 }
 
@@ -75,14 +93,15 @@ public void OnMapStart()
 {
 	GetCurrentMap(g_sCurrentMap, sizeof(g_sCurrentMap));
 	LoadConfig();
+	g_fLastPlayedTime.Clear();
 }
 
 public void OnMapEnd()
 {
 	delete g_songNames;
-	delete g_printedAlready;
+	delete g_fLastPlayedTime;
 	g_songNames = new StringMap();
-	g_printedAlready = new StringMap();
+	g_fLastPlayedTime = new StringMap();
 }
 
 public void OnClientDisconnected(int client)
@@ -92,6 +111,11 @@ public void OnClientDisconnected(int client)
 
 public void OnClientCookiesCached(int client)
 {
+	if (IsFakeClient(client))
+	{
+		return;
+	}
+
 	char buffer[2];
 	g_cDisplayStyle.Get(client, buffer, sizeof(buffer));
 	if (buffer[0] == '\0')
@@ -107,10 +131,12 @@ public void OnClientCookiesCached(int client)
 public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
 	g_sCurrentSong = "";
-	g_printedAlready.Clear();
+	g_fLastPlayedTime.Clear();
+
+	// Print map supported message
 	if (g_bConfigLoaded)
 	{
-		CreateTimer(5.0, Timer_OnRoundStartPost);
+		CreateTimer(5.0, Timer_OnRoundStartPost, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -131,6 +157,7 @@ public void CookiesMenu(int client, CookieMenuAction actions, any info, char[] b
 	{
 		g_bDisplay[client] = !g_bDisplay[client];
 		g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
+
 		if (g_bDisplay[client])
 		{
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
@@ -139,6 +166,7 @@ public void CookiesMenu(int client, CookieMenuAction actions, any info, char[] b
 		{
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Disabled");
 		}
+
 		ShowCookieMenu(client);
 	}
 }
@@ -156,6 +184,7 @@ public Action Command_NowPlaying(int client, int args)
 		CPrintToChat(client, "%t %t", "Chat Prefix", "No Name");
 		return Plugin_Handled;
 	}
+
 	CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
 	return Plugin_Handled;
 }
@@ -164,6 +193,7 @@ public Action Command_ToggleNP(int client, int args)
 {
 	g_bDisplay[client] = !g_bDisplay[client];
 	g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
+
 	if (g_bDisplay[client])
 	{
 		CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
@@ -185,12 +215,11 @@ public Action Command_ReloadMusicnames(int client, int args)
 public void LoadConfig()
 {
 	g_bConfigLoaded = false;
-
 	g_songNames.Clear();
-	g_printedAlready.Clear();
 
 	char g_sConfig[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, g_sConfig, sizeof(g_sConfig), "configs/musicname/%s.cfg", g_sCurrentMap);
+
 	KeyValues kv = new KeyValues("music");
 	if (!kv.ImportFromFile(g_sConfig))
 	{
@@ -218,7 +247,25 @@ public void LoadConfig()
 
 	delete kv;
 	g_bConfigLoaded = true;
+
 	return;
+}
+
+void GetFileFromPath(const char[] path, char[] buffer, int maxlen)
+{
+	char normalizedPath[PLATFORM_MAX_PATH];
+	strcopy(normalizedPath, sizeof(normalizedPath), path);
+	ReplaceString(normalizedPath, sizeof(normalizedPath), "\\", "/");
+	
+	int lastSlash = FindCharInString(normalizedPath, '/', true);
+	if (lastSlash != -1)
+	{
+		strcopy(buffer, maxlen, normalizedPath[lastSlash+1]);
+	}
+	else
+	{
+		strcopy(buffer, maxlen, normalizedPath);
+	}
 }
 
 public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float &volume, int &level, int &pitch, float pos[3], int &flags, float &delay)
@@ -233,55 +280,41 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
 		return Plugin_Continue;
 	}
 
-	char sFileName[PLATFORM_MAX_PATH], sBuffer[PLATFORM_MAX_PATH];
-	strcopy(sBuffer, sizeof(sBuffer), sample);
-	ReplaceString(sBuffer, sizeof(sBuffer), "\\", "/");
+	char sFileName[PLATFORM_MAX_PATH];
+	GetFileFromPath(sample, sFileName, sizeof(sFileName));
+	StringToLowerCase(sFileName);
 
-	int lastSlash = FindCharInString(sBuffer, '/', true);
-	if (lastSlash == -1)
+	char sBuffer[PLATFORM_MAX_PATH];
+	if (g_songNames.GetString(sFileName, sBuffer, sizeof(sBuffer)))
 	{
-		strcopy(sFileName, sizeof(sFileName), sBuffer);
-	}
-	else
-	{
-		strcopy(sFileName, sizeof(sFileName), sBuffer);
-		sBuffer[lastSlash+1] = '\0';
-		ReplaceString(sFileName, sizeof(sFileName), sBuffer, "");
-	}
+		float currentTime = GetGameTime();
+		float lastPlayed;
 
-	int len = strlen(sFileName);
-	for (int i = 0; i < len; i++)
-	{
-		sFileName[i] = CharToLower(sFileName[i]);
-	}
+		// Check if the song was played recently
+		if (g_fLastPlayedTime.GetValue(sFileName, lastPlayed) && (currentTime - lastPlayed) < g_fCooldownTime)
+		{
+			return Plugin_Continue;
+		}
 
-	bool bPrinted;
-	if (g_songNames.GetString(sFileName, sBuffer, sizeof(sBuffer)) && !g_printedAlready.GetValue(sFileName, bPrinted))
-	{
-		g_printedAlready.SetValue(sFileName, true);
+		// Update the timestamp
+		g_fLastPlayedTime.SetValue(sFileName, currentTime);
 		g_sCurrentSong = sBuffer;
+
+		// Announce the song to players
 		for (int client = 1; client <= MaxClients; client++)
 		{
 			if (!IsClientInGame(client) || IsFakeClient(client))
+			{
 				continue;
-
+			}
 			if (!g_bDisplay[client])
+			{
 				continue;
-
+			}
+			
 			CPrintToChat(client, "%t %t", "Chat Prefix", "Now Playing", g_sCurrentSong);
-		}
-
-		DataPack hSongData = new DataPack();
-		hSongData.WriteString(sFileName);
-		RequestFrame(ClearPrintedAlready, hSongData);
+		}	
 	}
-	return Plugin_Continue;
-}
 
-public void ClearPrintedAlready(DataPack hSongData)
-{
-	char sFileName[PLATFORM_MAX_PATH];
-	hSongData.Reset();
-	hSongData.ReadString(sFileName, sizeof(sFileName));
-	g_printedAlready.Remove(sFileName);
+	return Plugin_Continue;
 }
