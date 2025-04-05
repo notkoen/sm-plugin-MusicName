@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -54,8 +57,7 @@ jobs:
         with:
           delete_release: true
           tag_name: latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: rickstaa/action-create-tag@v1
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
