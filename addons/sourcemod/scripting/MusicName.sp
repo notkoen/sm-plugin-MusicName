@@ -184,10 +184,11 @@ public Action Command_DumpMusicnames(int client, int args) {
 
     StringMapSnapshot snap = g_songNames.Snapshot();
     int len = snap.Length;
-    char szBuffer[256];
+    char szBuffer[256], szSongName[256];
     for (int i = 0; i < len; i++) {
         snap.GetKey(i, szBuffer, sizeof(szBuffer));
-        PrintToConsole(client, "%i. %s", i + 1, szBuffer);
+        g_songNames.GetString(szBuffer, szSongName, sizeof(szSongName));
+        PrintToConsole(client, "%i. %s", i + 1, szSongName);
     }
 
     delete snap;
