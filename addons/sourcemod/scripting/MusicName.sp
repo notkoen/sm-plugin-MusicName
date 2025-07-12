@@ -1,7 +1,6 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-#include <clientprefs>
 #include <multicolors>
 #include <sourcemod>
 #include <sdkhooks>
@@ -12,7 +11,7 @@ public Plugin myinfo = {
     name = "Music Names",
     author = "koen, .Rushaway",
     description = "Displays the name of the current song in chat",
-    version = "1.1",
+    version = "1.2.0",
     url = "https://github.com/notkoen"
 };
 
@@ -22,7 +21,6 @@ char g_sCurrentMap[PLATFORM_MAX_PATH];
 bool g_bConfigLoaded = false;
 bool g_bDisplay[MAXPLAYERS+1] = {true, ...};
 
-Cookie g_cDisplayStyle;
 StringMap g_songNames;
 StringMap g_fLastPlayedTime;
 
@@ -40,9 +38,6 @@ public void OnPluginStart() {
 
     AddAmbientSoundHook(Hook_AmbientSound);
 
-    g_cDisplayStyle = new Cookie("display_musicnames", "Display music names cookie", CookieAccess_Private);
-    SetCookieMenuItem(CookiesMenu, 0, "Music Names");
-
     LoadTranslations("MusicName.phrases");
 
     g_cvCooldownTime = CreateConVar("sm_musicname_cooldown", "5.0", "Cooldown in seconds before the same song can be announced again", _, true, 1.0);
@@ -50,13 +45,6 @@ public void OnPluginStart() {
     g_fCooldownTime = g_cvCooldownTime.FloatValue;
 
     AutoExecConfig(true);
-
-    for (int i = 1; i <= MaxClients; i++) {
-        if (!AreClientCookiesCached(i))
-            continue;
-
-        OnClientCookiesCached(i);
-    }
 
     g_songNames = new StringMap();
     g_fLastPlayedTime = new StringMap();
@@ -69,12 +57,6 @@ public void OnCooldownChanged(ConVar convar, const char[] oldValue, const char[]
 }
 
 public void OnPluginEnd() {
-    for (int client = 1; client <= MaxClients; client++) {
-        char buffer[2];
-        buffer = g_bDisplay[client] ? "1" : "0";
-        g_cDisplayStyle.Set(client, buffer);
-    }
-
     delete g_songNames;
     delete g_fLastPlayedTime;
     RemoveAmbientSoundHook(Hook_AmbientSound);
@@ -97,19 +79,6 @@ public void OnClientDisconnected(int client) {
     g_bDisplay[client] = true;
 }
 
-public void OnClientCookiesCached(int client) {
-    if (IsFakeClient(client))
-        return;
-
-    char buffer[2];
-    g_cDisplayStyle.Get(client, buffer, sizeof(buffer));
-
-    if (buffer[0] == '\0')
-        g_cDisplayStyle.Set(client, "1");
-    else
-        g_bDisplay[client] = view_as<bool>(StringToInt(buffer));
-}
-
 public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast) {
     g_sCurrentSong = "";
     g_fLastPlayedTime.Clear();
@@ -122,24 +91,6 @@ public void OnRoundStart(Handle event, const char[] name, bool dontBroadcast) {
 public Action Timer_OnRoundStartPost(Handle timer) {
     CPrintToChatAll("%t %t", "Chat Prefix", "Map Supported");
     return Plugin_Stop;
-}
-
-public void CookiesMenu(int client, CookieMenuAction actions, any info, char[] buffer, int maxlen)
-{
-    if (actions == CookieMenuAction_DisplayOption)
-        FormatEx(buffer, maxlen, "Display Music Names: %s", g_bDisplay[client] ? "On" : "Off");
-
-    if (actions == CookieMenuAction_SelectOption) {
-        g_bDisplay[client] = !g_bDisplay[client];
-        g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
-
-        if (g_bDisplay[client])
-            CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
-        else
-            CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Disabled");
-
-        ShowCookieMenu(client);
-    }
 }
 
 public Action Command_NowPlaying(int client, int args) {
@@ -159,7 +110,6 @@ public Action Command_NowPlaying(int client, int args) {
 
 public Action Command_ToggleNP(int client, int args) {
     g_bDisplay[client] = !g_bDisplay[client];
-    g_cDisplayStyle.Set(client, g_bDisplay[client] ? "1" : "0");
 
     if (g_bDisplay[client])
         CPrintToChat(client, "%t %t", "Chat Prefix", "Display Status", "Enabled");
