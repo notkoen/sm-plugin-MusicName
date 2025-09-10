@@ -73,9 +73,14 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v5
+        with:
+          name: ${{ runner.os }}
+          path: artifacts
 
       - name: Versioning
         run: |
+          cd artifacts
+          ls -Rall
           version="latest"
           if [[ "${{ github.ref_type }}" == 'tag' ]]; then
             version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`;
@@ -84,12 +89,9 @@ jobs:
 
       - name: Package
         run: |
-          ls -Rall
-          if [ -d "./package/" ]; then
-            cd ./package/
-            tar -czf ../${{ github.event.repository.name }}-${{ env.RELEASE_VERSION }}.tar.gz -T <(\ls -1)
-            cd -
-          fi
+          tar -czf ../${{ github.event.repository.name }}-${{ env.RELEASE_VERSION }}.tar.gz .
+          cd ..
+          ls -la *.tar.gz
 
       - name: Release
         uses: svenstaro/upload-release-action@v2
