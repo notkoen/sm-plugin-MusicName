@@ -58,6 +58,14 @@
         "fr"        "Configuration des noms de musique rechargée."
     }
 
+    "Reload Failed"
+    {
+        "en"        "{fullred}Failed {white}to reload music names config."
+        "zho"       "重新載入歌名配置{fullred}出了問題{white}。"
+        "chi"       "重新载入歌名配置{fullred}出了问题{white}。"
+        "fr"        "{fullred}Échec {white}du rechargement de la configuration des noms de musique."
+    }
+
     "Map Supported"
     {
         "en"        "The current map has a music name config. Use \"{green}!np{white}\" to see the name of the current playing song."
