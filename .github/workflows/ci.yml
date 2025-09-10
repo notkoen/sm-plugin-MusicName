@@ -22,9 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Build sourcemod plugin
@@ -41,7 +41,7 @@ jobs:
       - name: Upload build archive for test runners
         uses: actions/upload-artifact@v4
         with:
-          name: package
+          name: ${{ runner.os }}
           path: /tmp/package
 
   tag:
@@ -57,7 +57,8 @@ jobs:
         with:
           delete_release: true
           tag_name: latest
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: rickstaa/action-create-tag@v1
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
@@ -79,8 +80,6 @@ jobs:
 
       - name: Versioning
         run: |
-          cd artifacts
-          ls -Rall
           version="latest"
           if [[ "${{ github.ref_type }}" == 'tag' ]]; then
             version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`;
@@ -89,6 +88,8 @@ jobs:
 
       - name: Package
         run: |
+          cd artifacts
+          ls -Rall
           tar -czf ../${{ github.event.repository.name }}-${{ env.RELEASE_VERSION }}.tar.gz .
           cd ..
           ls -la *.tar.gz
