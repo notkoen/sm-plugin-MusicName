@@ -97,15 +97,6 @@ public void OnPluginEnd()
 public void OnMapStart()
 {
     LoadConfig();
-
-    if (g_songNames != null)
-        delete g_songNames;
-    
-    if (g_fLastPlayedTime != null)
-        delete g_fLastPlayedTime;
-
-    g_songNames = new StringMap();
-    g_fLastPlayedTime = new StringMap();
 }
 
 public void OnMapEnd()
@@ -201,11 +192,11 @@ public Action Command_DumpMusic(int client, int args)
 {
     if (!g_bConfigLoaded)
     {
-        CPrintToChat(client, "%t %t", "Chat Prefix", "No Config");
+        CReplyToCommand(client, "%t %t", "Chat Prefix", "No Config");
         return Plugin_Handled;
     }
 
-    CPrintToChat(client, "%t %t", "Chat Prefix", "Check Console for Output");
+    CReplyToCommand(client, "%t %t", "Chat Prefix", "Check Console for Output");
     PrintToConsole(client, "-------------- Music Names --------------");
 
     StringMapSnapshot snap = g_songNames.Snapshot();
