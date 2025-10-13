@@ -129,7 +129,8 @@ public void CookiesMenu(int client, CookieMenuAction actions, any info, char[] b
     if (actions == CookieMenuAction_DisplayOption)
         FormatEx(buffer, maxlen, "Display Music Names: %s", g_bDisplay[client] ? "On" : "Off");
 
-    if (actions == CookieMenuAction_SelectOption) {
+    if (actions == CookieMenuAction_SelectOption)
+    {
         ToggleFeature(client);
         ShowCookieMenu(client);
     }
@@ -239,7 +240,7 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
     if (!g_bConfigLoaded)
         return Plugin_Continue;
 
-    // Mappers might use "volume 0" to stop music, which triggers sound hook
+    // Using "volume 0" to stop music triggers sound hook
     // So check if this is the input
     if (volume == 0.0)
         return Plugin_Continue;
@@ -251,7 +252,7 @@ public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, flo
     char sBuffer[PLATFORM_MAX_PATH];
     if (g_songNames.GetString(sFileName, sBuffer, sizeof(sBuffer)))
     {
-        // Mappers might also use "volume" input to fade music out, which also triggers sound hook
+        // Using "volume" input to fade music out also triggers sound hook
         // So check if detected song is same as current song
         if (strcmp(sBuffer, g_sCurrentSong, false) == 0)
             return Plugin_Continue;
