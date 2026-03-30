@@ -10,7 +10,7 @@ public Plugin myinfo =
     name = "Music Names",
     author = "koen, .Rushaway",
     description = "Display the name of music in chat",
-    version = "1.3",
+    version = "1.3.2",
 };
 
 char g_sCurrentSong[256];
@@ -103,6 +103,8 @@ public void OnMapEnd()
 {
     delete g_songNames;
     delete g_fLastPlayedTime;
+    g_bConfigLoaded = false;
+    g_sCurrentSong = "";
 }
 
 public void OnClientDisconnected(int client)
@@ -191,7 +193,7 @@ public Action Command_ToggleNP(int client, int args)
 //----------------------------------------------------------------------------------------------------
 public Action Command_DumpMusic(int client, int args)
 {
-    if (!g_bConfigLoaded)
+    if (!EnsureMusicState())
     {
         CReplyToCommand(client, "%t %t", "Chat Prefix", "No Config");
         return Plugin_Handled;
@@ -237,7 +239,7 @@ public Action Command_ReloadMusicnames(int client, int args)
 //----------------------------------------------------------------------------------------------------
 public Action Hook_AmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float &volume, int &level, int &pitch, float pos[3], int &flags, float &delay)
 {
-    if (!g_bConfigLoaded)
+    if (!EnsureMusicState())
         return Plugin_Continue;
 
     // Using "volume 0" to stop music triggers sound hook
@@ -360,6 +362,24 @@ stock void StringToLowerCase(char[] input)
             input[i] += ('a' - 'A');
         i++;
     }
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Ensure runtime state is valid and config is loaded
+//----------------------------------------------------------------------------------------------------
+stock bool EnsureMusicState()
+{
+    if (g_songNames == null)
+        g_songNames = new StringMap();
+
+    if (g_fLastPlayedTime == null)
+        g_fLastPlayedTime = new StringMap();
+
+    if (g_bConfigLoaded)
+        return true;
+
+    LoadConfig();
+    return g_bConfigLoaded;
 }
 
 //----------------------------------------------------------------------------------------------------
