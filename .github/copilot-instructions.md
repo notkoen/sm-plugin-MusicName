@@ -16,7 +16,7 @@ This repository contains the **MusicName** SourceMod plugin, which automatically
 
 - **Language**: SourcePawn (SourceMod scripting language)
 - **Target Platform**: SourceMod 1.12+ on Source engine games
-- **Build System**: SourceKnight (modern SourceMod build tool)
+- **Build System**: Native GitHub Actions workflow using `rumblefrog/setup-sp` (spcomp)
 - **CI/CD**: GitHub Actions with automated building and releases
 - **Dependencies**: MultiColors (chat colors), UtilsHelper (utility functions)
 
@@ -33,8 +33,6 @@ addons/sourcemod/
 ├── workflows/
 │   └── ci.yml                    # GitHub Actions CI/CD pipeline
 └── dependabot.yml               # Dependency management
-
-sourceknight.yaml                 # SourceKnight build configuration
 ```
 
 ### Runtime Configuration Structure
@@ -79,34 +77,27 @@ This repository follows strict SourcePawn coding standards:
 ## Build & Development Process
 
 ### Local Development Setup
-1. Install SourceKnight: Follow instructions at https://github.com/srcdslab/sourceknight
+1. Install the SourcePawn compiler (`spcomp`) matching SourceMod 1.12.x, e.g. via https://github.com/rumblefrog/setup-sp or a local SourceMod SDK install.
 2. Clone repository with dependencies:
    ```bash
    git clone <repository-url>
    cd sm-plugin-MusicName
-   sourceknight build  # Downloads dependencies and compiles
+   # Fetch include dependencies (see below), then compile manually
    ```
 
 ### Build Commands
 ```bash
-# Build the plugin
-sourceknight build
-
-# Clean build artifacts
-sourceknight clean
-
-# Install dependencies only
-sourceknight install
+# Compile the plugin (from addons/sourcemod/scripting)
+spcomp -i include MusicName.sp
 ```
 
 ### Dependencies Management
-Dependencies are defined in `sourceknight.yaml`:
-- **sourcemod**: Core SourceMod framework (version 1.13.0-git7221)
-- **multicolors**: Advanced chat color support
-- **utilshelper**: Common utility functions
+Dependencies are fetched directly in the CI workflow (`.github/workflows/ci.yml`):
+- **sourcemod**: Core SourceMod framework (version 1.12.x, via `rumblefrog/setup-sp`)
+- **multicolors**: Advanced chat color support (cloned from `srcdslab/sm-plugin-MultiColors`)
 
 ### Testing Your Changes
-1. Build the plugin: `sourceknight build`
+1. Build the plugin: compile `MusicName.sp` with `spcomp`
 2. Copy built .smx file to test server: `addons/sourcemod/plugins/`
 3. Copy translation file: `addons/sourcemod/translations/`
 4. Create test config: `addons/sourcemod/configs/musicname/<mapname>.cfg`
@@ -216,9 +207,9 @@ StringToLowerCase(sFileName); // Only convert once
 ## Common Issues & Troubleshooting
 
 ### Build Issues
-- **Missing dependencies**: Run `sourceknight install` first
+- **Missing dependencies**: Ensure include dependencies are present in `addons/sourcemod/scripting/include`
 - **Compilation errors**: Check for missing includes or syntax errors
-- **Version conflicts**: Ensure SourceMod version matches sourceknight.yaml
+- **Version conflicts**: Ensure SourceMod version matches the CI workflow (1.12.x)
 
 ### Runtime Issues
 - **Config not loading**: Check file path `/sourcemod/configs/musicname/<mapname>.cfg`
